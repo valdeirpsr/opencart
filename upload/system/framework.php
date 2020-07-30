@@ -4,13 +4,17 @@ $registry = new Registry();
 
 // Config
 $config = new Config();
+
+// Load the default config
 $config->load('default');
-$config->load($application_config);
+$config->load($application);
 $registry->set('config', $config);
 
 // Log
 $log = new Log($config->get('error_filename'));
 $registry->set('log', $log);
+
+date_default_timezone_set($config->get('date_timezone'));
 
 set_error_handler(function($code, $message, $file, $line) use($log, $config) {
 	// error suppressed with @
@@ -47,14 +51,26 @@ set_error_handler(function($code, $message, $file, $line) use($log, $config) {
 	return true;
 });
 
+set_exception_handler(function($e) use ($log, $config) {
+	if ($config->get('error_display')) {
+		echo '<b>' . get_class($e) . '</b>: ' . $e->getMessage() . ' in <b>' . $e->getFile() . '</b> on line <b>' . $e->getLine() . '</b>';
+	}
+
+	if ($config->get('error_log')) {
+		$log->write(get_class($e) . ':  ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine());
+	}
+});
+
 // Event
-$event = new Event($registry);
+$event = new \Event($registry);
 $registry->set('event', $event);
 
 // Event Register
 if ($config->has('action_event')) {
 	foreach ($config->get('action_event') as $key => $value) {
-		$event->register($key, new Action($value));
+		foreach ($value as $priority => $action) {
+			$event->register($key, new Action($action), $priority);
+		}
 	}
 }
 
@@ -63,43 +79,72 @@ $loader = new Loader($registry);
 $registry->set('load', $loader);
 
 // Request
-$registry->set('request', new Request());
+$request = new Request();
+$registry->set('request', $request);
 
 // Response
 $response = new Response();
-$response->addHeader('Content-Type: text/html; charset=utf-8');
+foreach ($config->get('response_header') as $header) {
+    $response->addHeader($header);
+}
+$response->setCompression($config->get('response_compression'));
 $registry->set('response', $response);
 
 // Database
 if ($config->get('db_autostart')) {
-	try {
-		$registry->set('db', new DB($config->get('db_type'), $config->get('db_hostname'), $config->get('db_username'), $config->get('db_password'), $config->get('db_database'), $config->get('db_port')));
-	} catch(Exception $e) {
-		$response->redirect($config->get('site_base') . 'maintenance.html');
-	}
+	$db = new DB($config->get('db_engine'), $config->get('db_hostname'), $config->get('db_username'), $config->get('db_password'), $config->get('db_database'), $config->get('db_port'));
+	$registry->set('db', $db);
+
+	// Sync PHP and DB time zones
+	$db->query("SET time_zone = '" . $db->escape(date('P')) . "'");
 }
 
 // Session
-$session = new Session();
-
-if ($config->get('session_autostart')) {
-	$session->start();
-}
-
+$session = new Session($config->get('session_engine'), $registry);
 $registry->set('session', $session);
 
-// Cache 
-$registry->set('cache', new Cache($config->get('cache_type'), $config->get('cache_expire')));
+if ($config->get('session_autostart')) {
+	/*
+	We are adding the session cookie outside of the session class as I believe
+	PHP messed up in a big way handling sessions. Why in the hell is it so hard to
+	have more than one concurrent session using cookies!
 
-// Url
-if ($config->get('url_autostart')) {
-	$registry->set('url', new Url($config->get('site_base'), $config->get('site_ssl')));
+	Is it not better to have multiple cookies when accessing parts of the system
+	that requires different cookie sessions for security reasons.
+
+	Also cookies can be accessed via the URL parameters. So why force only one cookie
+	for all sessions!
+	*/
+
+	if (isset($_COOKIE[$config->get('session_name')])) {
+		$session_id = $_COOKIE[$config->get('session_name')];
+	} else {
+		$session_id = '';
+	}
+
+	$session->start($session_id);
+
+	// Require higher security for session cookies
+	$option = array(
+		'max-age'  => time() + $config->get('session_expire'),
+		'path'     => !empty($_SERVER['PHP_SELF']) ? dirname($_SERVER['PHP_SELF']) . '/' : '',
+		'domain'   => $_SERVER['HTTP_HOST'],
+		'secure'   => $_SERVER['HTTPS'],
+		'httponly' => false,
+		'SameSite' => 'strict'
+	);
+
+	oc_setcookie($config->get('session_name'), $session->getId(), $option);
 }
 
+// Cache
+$registry->set('cache', new Cache($config->get('cache_engine'), $config->get('cache_expire')));
+
+// Url
+$registry->set('url', new Url($config->get('site_url')));
+
 // Language
-$language = new Language($config->get('language_default'));
-$language->load($config->get('language_default'));
-$registry->set('language', $language);
+$registry->set('language', new Language($config->get('language_directory')));
 
 // Document
 $registry->set('document', new Document());
@@ -118,6 +163,13 @@ if ($config->has('language_autoload')) {
 	}
 }
 
+// Helper Autoload
+if ($config->has('helper_autoload')) {
+	foreach ($config->get('helper_autoload') as $value) {
+		$loader->model($value);
+	}
+}
+
 // Library Autoload
 if ($config->has('library_autoload')) {
 	foreach ($config->get('library_autoload') as $value) {
@@ -132,19 +184,18 @@ if ($config->has('model_autoload')) {
 	}
 }
 
-// Front Controller
-$controller = new Front($registry);
+// Route
+$route = new Router($registry);
 
 // Pre Actions
 if ($config->has('action_pre_action')) {
 	foreach ($config->get('action_pre_action') as $value) {
-		$controller->addPreAction(new Action($value));
+		$route->addPreAction(new Action($value));
 	}
 }
 
 // Dispatch
-$controller->dispatch(new Action($config->get('action_router')), new Action($config->get('action_error')));
+$route->dispatch(new Action($config->get('action_router')), new Action($config->get('action_error')));
 
 // Output
-$response->setCompression($config->get('config_compression'));
 $response->output();

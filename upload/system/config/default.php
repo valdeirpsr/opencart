@@ -1,18 +1,17 @@
 <?php
 // Site
-$_['site_base']            = '';
-$_['site_ssl']             = false;
-
-// Url
-$_['url_autostart']        = true;
+$_['site_url']             = '';
 
 // Language
-$_['language_default']     = 'en-gb';
+$_['language_directory']   = 'en-gb';
 $_['language_autoload']    = array('en-gb');
+
+// Date
+$_['date_timezone']        = 'UTC';
 
 // Database
 $_['db_autostart']         = false;
-$_['db_type']              = 'mysqli'; // mpdo, mssql, mysql, mysqli or postgre
+$_['db_engine']            = 'mysqli'; // mysqli, pdo or pgsql
 $_['db_hostname']          = 'localhost';
 $_['db_username']          = 'root';
 $_['db_password']          = '';
@@ -20,7 +19,7 @@ $_['db_database']          = '';
 $_['db_port']              = 3306;
 
 // Mail
-$_['mail_protocol']        = 'mail'; // mail or smtp
+$_['mail_engine']          = 'mail'; // mail or smtp
 $_['mail_from']            = ''; // Your E-Mail
 $_['mail_sender']          = ''; // Your name or company name
 $_['mail_reply_to']        = ''; // Reply to E-Mail
@@ -33,22 +32,26 @@ $_['mail_verp']            = false;
 $_['mail_parameter']       = '';
 
 // Cache
-$_['cache_type']           = 'file'; // apc, file or mem
+$_['cache_engine']         = 'file'; // apc, file, mem, memcached or redis
 $_['cache_expire']         = 3600;
 
 // Session
 $_['session_autostart']    = true;
-$_['session_name']         = 'PHPSESSID';
+$_['session_engine']       = 'file';
+$_['session_name']         = 'OCSESSID';
+$_['session_expire']       = 360000;
 
 // Template
-$_['template_type']        = 'php';
+$_['template_engine']      = 'twig';
+$_['template_directory']   = '';
+$_['template_extension']   = '.twig';
 
 // Error
-$_['error_display']        = false;
+$_['error_display']        = true;
 $_['error_log']            = true;
 $_['error_filename']       = 'error.log';
 
-// Reponse
+// Response
 $_['response_header']      = array('Content-Type: text/html; charset=utf-8');
 $_['response_compression'] = 0;
 
@@ -58,8 +61,11 @@ $_['config_autoload']      = array();
 // Autoload Libraries
 $_['library_autoload']     = array();
 
-// Autoload Libraries
+// Autoload Models
 $_['model_autoload']       = array();
+
+// Autoload Helpers
+$_['helper_autoload']      = array();
 
 // Actions
 $_['action_default']       = 'common/home';

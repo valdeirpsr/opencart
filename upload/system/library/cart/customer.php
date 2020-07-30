@@ -7,7 +7,6 @@ class Customer {
 	private $customer_group_id;
 	private $email;
 	private $telephone;
-	private $fax;
 	private $newsletter;
 	private $address_id;
 
@@ -27,31 +26,36 @@ class Customer {
 				$this->customer_group_id = $customer_query->row['customer_group_id'];
 				$this->email = $customer_query->row['email'];
 				$this->telephone = $customer_query->row['telephone'];
-				$this->fax = $customer_query->row['fax'];
 				$this->newsletter = $customer_query->row['newsletter'];
 				$this->address_id = $customer_query->row['address_id'];
 
 				$this->db->query("UPDATE " . DB_PREFIX . "customer SET language_id = '" . (int)$this->config->get('config_language_id') . "', ip = '" . $this->db->escape($this->request->server['REMOTE_ADDR']) . "' WHERE customer_id = '" . (int)$this->customer_id . "'");
-
-				$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "customer_ip WHERE customer_id = '" . (int)$this->session->data['customer_id'] . "' AND ip = '" . $this->db->escape($this->request->server['REMOTE_ADDR']) . "'");
-
-				if (!$query->num_rows) {
-					$this->db->query("INSERT INTO " . DB_PREFIX . "customer_ip SET customer_id = '" . (int)$this->session->data['customer_id'] . "', ip = '" . $this->db->escape($this->request->server['REMOTE_ADDR']) . "', date_added = NOW()");
-				}
 			} else {
 				$this->logout();
 			}
 		}
 	}
 
-	public function login($email, $password, $override = false) {
-		if ($override) {
-			$customer_query = $this->db->query("SELECT * FROM " . DB_PREFIX . "customer WHERE LOWER(email) = '" . $this->db->escape(utf8_strtolower($email)) . "' AND status = '1'");
-		} else {
-			$customer_query = $this->db->query("SELECT * FROM " . DB_PREFIX . "customer WHERE LOWER(email) = '" . $this->db->escape(utf8_strtolower($email)) . "' AND (password = SHA1(CONCAT(salt, SHA1(CONCAT(salt, SHA1('" . $this->db->escape($password) . "'))))) OR password = '" . $this->db->escape(md5($password)) . "') AND status = '1' AND approved = '1'");
-		}
+  public function login($email, $password, $override = false) {
+	  $customer_query = $this->db->query("SELECT * FROM " . DB_PREFIX . "customer WHERE LOWER(email) = '" . $this->db->escape(utf8_strtolower($email)) . "' AND status = '1'");
 
-		if ($customer_query->num_rows) {
+		if ($customer_query->row) {
+			if (!$override) {
+				if (password_verify($password, $customer_query->row['password'])) {
+					$rehash = password_needs_rehash($customer_query->row['password'], PASSWORD_DEFAULT);
+				} elseif ($customer_query->row['password'] == sha1($customer_query->row['salt'] . sha1($customer_query->row['salt'] . sha1($password)))) {
+					$rehash = true;
+				} elseif ($customer_query->row['password'] == md5($password)) {
+					$rehash = true;
+				} else {
+					return false;
+				}
+
+				if ($rehash) {
+					$this->db->query("UPDATE " . DB_PREFIX . "customer SET salt = '', password = '" . $this->db->escape(password_hash($password, PASSWORD_DEFAULT)) . "' WHERE customer_id = '" . (int)$customer_query->row['customer_id'] . "'");
+				}
+			}
+
 			$this->session->data['customer_id'] = $customer_query->row['customer_id'];
 
 			$this->customer_id = $customer_query->row['customer_id'];
@@ -60,7 +64,6 @@ class Customer {
 			$this->customer_group_id = $customer_query->row['customer_group_id'];
 			$this->email = $customer_query->row['email'];
 			$this->telephone = $customer_query->row['telephone'];
-			$this->fax = $customer_query->row['fax'];
 			$this->newsletter = $customer_query->row['newsletter'];
 			$this->address_id = $customer_query->row['address_id'];
 
@@ -78,10 +81,9 @@ class Customer {
 		$this->customer_id = '';
 		$this->firstname = '';
 		$this->lastname = '';
-		$this->customer_group_id = '';
+		$this->customer_group_id = 0;
 		$this->email = '';
 		$this->telephone = '';
-		$this->fax = '';
 		$this->newsletter = '';
 		$this->address_id = '';
 	}
@@ -114,10 +116,6 @@ class Customer {
 		return $this->telephone;
 	}
 
-	public function getFax() {
-		return $this->fax;
-	}
-
 	public function getNewsletter() {
 		return $this->newsletter;
 	}
@@ -127,13 +125,13 @@ class Customer {
 	}
 
 	public function getBalance() {
-		$query = $this->db->query("SELECT SUM(amount) AS total FROM " . DB_PREFIX . "customer_transaction WHERE customer_id = '" . (int)$this->customer_id . "'");
+		$query = $this->db->query("SELECT SUM(amount) AS total FROM `" . DB_PREFIX . "customer_transaction` WHERE `customer_id` = '" . (int)$this->customer_id . "'");
 
 		return $query->row['total'];
 	}
 
 	public function getRewardPoints() {
-		$query = $this->db->query("SELECT SUM(points) AS total FROM " . DB_PREFIX . "customer_reward WHERE customer_id = '" . (int)$this->customer_id . "'");
+		$query = $this->db->query("SELECT SUM(points) AS total FROM `" . DB_PREFIX . "customer_reward` WHERE `customer_id` = '" . (int)$this->customer_id . "'");
 
 		return $query->row['total'];
 	}

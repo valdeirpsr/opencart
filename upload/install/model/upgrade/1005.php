@@ -1,41 +1,6 @@
 <?php
 class ModelUpgrade1005 extends Model {
 	public function upgrade() {
-		// api
-		$query = $this->db->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" . DB_DATABASE . "' AND TABLE_NAME = '" . DB_PREFIX . "api' AND COLUMN_NAME = 'username'");
-
-		if ($query->num_rows) {
-			$query = $this->db->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" . DB_DATABASE . "' AND TABLE_NAME = '" . DB_PREFIX . "api' AND COLUMN_NAME = 'name'");
-
-			if ($query->num_rows) {
-				$this->db->query("UPDATE `" . DB_PREFIX . "api` SET `name` = `username` WHERE `name` IS NULL or `name` = ''");
-				$this->db->query("ALTER TABLE `" . DB_PREFIX . "api` DROP `username`");
-			} else {
-				$this->db->query("ALTER TABLE `" . DB_PREFIX . "api` CHANGE `username` `name` varchar(64) NOT NULL");
-			}
-		}
-
-		// api
-		$query = $this->db->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" . DB_DATABASE . "' AND TABLE_NAME = '" . DB_PREFIX . "api' AND COLUMN_NAME = 'password'");
-
-		if ($query->num_rows) {
-			$query = $this->db->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" . DB_DATABASE . "' AND TABLE_NAME = '" . DB_PREFIX . "api' AND COLUMN_NAME = 'key'");
-
-			if ($query->num_rows) {
-				$this->db->query("UPDATE `" . DB_PREFIX . "api` SET `key` = `password` WHERE `key` IS NULL or `key` = ''");
-				$this->db->query("ALTER TABLE `" . DB_PREFIX . "api` DROP `password`");
-			} else {
-				$this->db->query("ALTER TABLE `" . DB_PREFIX . "api` CHANGE `password` `key` text NOT NULL");
-			}
-		}
-
-		// Insert default API record if not set
-		$query = $this->db->query("SELECT * FROM " . DB_PREFIX . "api");
-
-		if (!$query->num_rows) {
-			$this->db->query("INSERT INTO " . DB_PREFIX . "api (api_id, name, `key`, status, date_added, date_modified) values(1, 'json', '" . hash('sha512', mt_rand()) . "' , 1, now(), now())");
-		}
-
 		// customer
 		$this->db->query("ALTER TABLE `" . DB_PREFIX . "customer` CHANGE `token` `token` text NOT NULL");
 
@@ -68,32 +33,6 @@ class ModelUpgrade1005 extends Model {
 
 		if (!$query->num_rows) {
 			$this->db->query("ALTER TABLE `" . DB_PREFIX . "product_description` ADD `meta_title` varchar(255) NOT NULL AFTER `description`");
-		}
-
-		// product_image
-		$index_data = array();
-
-		$query = $this->db->query("SHOW INDEX FROM `" . DB_PREFIX . "product_image` WHERE Key_name != 'PRIMARY'");
-
-		foreach ($query->rows as $result) {
-			$index_data[] = $result['Column_name'];
-		}
-
-		if (!in_array('product_id', $index_data)) {
-			$this->db->query("ALTER TABLE `" . DB_PREFIX . "product_image` ADD INDEX `product_id` (`product_id`)");
-		}
-
-		// product_to_category
-		$index_data = array();
-
-		$query = $this->db->query("SHOW INDEX FROM `" . DB_PREFIX . "product_to_category` WHERE Key_name != 'PRIMARY'");
-
-		foreach ($query->rows as $result) {
-			$index_data[] = $result['Column_name'];
-		}
-
-		if (!in_array('category_id', $index_data)) {
-			$this->db->query("ALTER TABLE `" . DB_PREFIX . "product_to_category` ADD INDEX `category_id` (`category_id`)");
 		}
 
 		// product_recurring
@@ -133,23 +72,6 @@ class ModelUpgrade1005 extends Model {
 
 		// order_recurring_transaction
 		$this->db->query("ALTER TABLE `" . DB_PREFIX . "order_recurring_transaction` CHANGE `type` `type` varchar(255) NOT NULL AFTER `reference`");
-
-		// url_alias
-		$index_data = array();
-
-		$query = $this->db->query("SHOW INDEX FROM `" . DB_PREFIX . "url_alias` WHERE Key_name != 'PRIMARY'");
-
-		foreach ($query->rows as $result) {
-			$index_data[] = $result['Column_name'];
-		}
-
-		if (!in_array('query', $index_data)) {
-			$this->db->query("ALTER TABLE `" . DB_PREFIX . "url_alias` ADD INDEX `query` (`query`)");
-		}
-
-		if (!in_array('keyword', $index_data)) {
-			$this->db->query("ALTER TABLE `" . DB_PREFIX . "url_alias` ADD INDEX `keyword` (`keyword`)");
-		}
 
 		// user
 		$query = $this->db->query("SELECT * FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = '" . DB_DATABASE . "' AND TABLE_NAME = '" . DB_PREFIX . "user' AND COLUMN_NAME = 'image'");
@@ -192,27 +114,6 @@ class ModelUpgrade1005 extends Model {
 		}
 
 		// setting
-		$query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "setting` WHERE `key` = 'config_image_location_height'");
-
-		if (!$query->num_rows) {
-			$this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `key` = 'config_image_location_height', `value` = '50', `code` = 'config', `serialized` = '0', `store_id` = 0");
-		}
-
-		// setting
-		$query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "setting` WHERE `key` = 'config_image_location_width'");
-
-		if (!$query->num_rows) {
-			$this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `key` = 'config_image_location_width', `value` = '258', `code` = 'config', `serialized` = '0', `store_id` = 0");
-		}
-
-		// setting
-		$query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "setting` WHERE `key` = 'config_product_limit'");
-
-		if (!$query->num_rows) {
-			$this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `key` = 'config_product_limit', `value` = '20', `code` = 'config', `serialized` = '0', `store_id` = 0");
-		}
-
-		// setting
 		$query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "setting` WHERE `key` = 'config_product_description_length'");
 
 		if (!$query->num_rows) {
@@ -220,10 +121,10 @@ class ModelUpgrade1005 extends Model {
 		}
 
 		// setting
-		$query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "setting` WHERE `key` = 'config_limit_admin'");
+		$query = $this->db->query("SELECT * FROM `" . DB_PREFIX . "setting` WHERE `key` = 'config_pagination'");
 
 		if (!$query->num_rows) {
-			$this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `key` = 'config_limit_admin', `value` = '20', `code` = 'config', `serialized` = '0', `store_id` = 0");
+			$this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `key` = 'config_pagination', `value` = '20', `code` = 'config', `serialized` = '0', `store_id` = 0");
 		}
 
 		// setting
@@ -235,10 +136,11 @@ class ModelUpgrade1005 extends Model {
 			$this->db->query("DELETE FROM `" . DB_PREFIX . "setting` WHERE `key` = 'config_encryption'");
 			$this->db->query("INSERT INTO `" . DB_PREFIX . "setting` SET `key` = 'config_encryption', `value` = '" . hash('sha512', mt_rand()) . "', `code` = 'config', `serialized` = '0', `store_id` = 0");
 		}
+
 		// force some settings to prevent errors
-		$this->db->query("UPDATE " . DB_PREFIX . "setting set value = 'default' WHERE `key` = 'config_template'");
-		$this->db->query("UPDATE " . DB_PREFIX . "setting set value = '1' WHERE `key` = 'config_error_display'");
-		$this->db->query("UPDATE " . DB_PREFIX . "setting set value = '1' WHERE `key` = 'config_error_log'");
-		$this->db->query("UPDATE " . DB_PREFIX . "setting set value = '0' WHERE `key` = 'config_compression'");
+		$this->db->query("UPDATE " . DB_PREFIX . "setting SET value = 'default' WHERE `key` = 'config_template'");
+		$this->db->query("UPDATE " . DB_PREFIX . "setting SET value = '1' WHERE `key` = 'config_error_display'");
+		$this->db->query("UPDATE " . DB_PREFIX . "setting SET value = '1' WHERE `key` = 'config_error_log'");
+		$this->db->query("UPDATE " . DB_PREFIX . "setting SET value = '0' WHERE `key` = 'config_compression'");
 	}
 }
